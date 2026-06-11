@@ -201,6 +201,7 @@ def hard_viterbi_decode(rx_bits):
 
 ber_rayleigh = []
 ber_inter = []
+ber_fec_no_inter = []
 ber_fec = []
 
 for snr in EBN0_DB:
@@ -233,7 +234,7 @@ for snr in EBN0_DB:
 
     # ==================================
     # CASO 2
-    # Interleaving
+    # Rayleigh + Interleaving
     # ==================================
 
     inter_bits = interleave(
@@ -263,7 +264,33 @@ for snr in EBN0_DB:
 
     # ==================================
     # CASO 3
-    # Interleaving + FEC
+    # Rayleigh + FEC (sem interleaving)
+    # ==================================
+
+    encoded = conv_encode(bits)
+
+    tx = bpsk_mod(encoded)
+
+    faded = rayleigh_block_fading(
+        tx,
+        FADE_BLOCK
+    )
+
+    rx = awgn(faded, snr)
+
+    det = detect(rx)
+
+    decoded = hard_viterbi_decode(det)
+
+    m = min(len(bits), len(decoded))
+
+    ber_fec_no_inter.append(
+        ber(bits[:m], decoded[:m])
+    )
+
+    # ==================================
+    # CASO 4
+    # Rayleigh + Interleaving + FEC
     # ==================================
 
     encoded = conv_encode(bits)
@@ -301,40 +328,54 @@ for snr in EBN0_DB:
         f"SNR={snr:2d} dB | "
         f"BER={ber_rayleigh[-1]:.4e} | "
         f"INT={ber_inter[-1]:.4e} | "
-        f"FEC={ber_fec[-1]:.4e}"
+        f"FEC_SI={ber_fec_no_inter[-1]:.4e} | "
+        f"FEC_INT={ber_fec[-1]:.4e}"
     )
 
 # ==========================================================
 # GRÁFICO
 # ==========================================================
 
-plt.figure(figsize=(8,5), dpi=150)
+plt.style.use('seaborn-v0_8-whitegrid')
+
+plt.figure(figsize=(8, 5.5), dpi=200)
 
 plt.semilogy(
-    EBN0_DB,
-    ber_rayleigh,
-    'o-',
+    EBN0_DB, ber_rayleigh,
+    color='#1f1f1f', linestyle='-',
+    marker='o', markersize=6, linewidth=2.2,
+    markerfacecolor='white', markeredgewidth=1.2,
     label='Rayleigh'
 )
 
 plt.semilogy(
-    EBN0_DB,
-    ber_inter,
-    's--',
+    EBN0_DB, ber_inter,
+    color='#1f77b4', linestyle='--',
+    marker='s', markersize=6, linewidth=2.2,
+    markerfacecolor='white', markeredgewidth=1.2,
     label='Rayleigh + Interleaving'
 )
 
 plt.semilogy(
-    EBN0_DB,
-    ber_fec,
-    'd-.',
+    EBN0_DB, ber_fec_no_inter,
+    color='#d62728', linestyle='-.',
+    marker='^', markersize=6, linewidth=2.4,
+    markerfacecolor='white', markeredgewidth=1.2,
+    label='Rayleigh + FEC (sem interleaving)'
+)
+
+plt.semilogy(
+    EBN0_DB, ber_fec,
+    color="#95f12a", linestyle=':',
+    marker='D', markersize=6, linewidth=2.4,
+    markerfacecolor='white', markeredgewidth=1.2,
     label='Rayleigh + Interleaving + FEC'
 )
 
-plt.grid(True, which='both')
+plt.grid(True, which='both', linestyle='--', alpha=0.45)
 plt.xlabel(r'$E_b/N_0$ (dB)')
 plt.ylabel('BER')
-plt.title('BER em Canal Rayleigh')
-plt.legend()
+#plt.title('BER em Canal Rayleigh', pad=10)
+plt.legend(frameon=True, facecolor='white', framealpha=0.95)
 plt.tight_layout()
 plt.show()
